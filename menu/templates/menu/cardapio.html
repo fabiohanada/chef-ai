@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ restaurant.name }} - Cardápio Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 pb-24" x-data="cartApp()">
+
+    <!-- Header / Info da Loja -->
+    <header class="bg-red-600 text-white p-6 shadow-md text-center">
+        <h1 class="text-2xl font-bold">{{ restaurant.name }}</h1>
+        <p class="text-sm mt-1 opacity-90">Faça seu pedido diretamente pelo WhatsApp</p>
+    </header>
+
+    <!-- Cardápio / Categorias -->
+    <main class="max-w-2xl mx-auto p-4 space-y-6">
+        {% for category in categories %}
+            <section class="bg-white rounded-xl p-4 shadow-sm">
+                <h2 class="text-lg font-bold border-b pb-2 mb-3 text-red-600">{{ category.name }}</h2>
+                
+                <div class="space-y-4">
+                    {% for product in category.products.all %}
+                        {% if product.is_available %}
+                            <div class="flex justify-between items-center border-b last:border-0 pb-3">
+                                <div class="pr-4">
+                                    <h3 class="font-semibold text-gray-900">{{ product.name }}</h3>
+                                    <p class="text-xs text-gray-500 mt-0.5">{{ product.description }}</p>
+                                    <span class="text-sm font-bold text-green-600 mt-1 block">
+                                        R$ {{ product.price }}
+                                    </span>
+                                </div>
+                                <button 
+                                    @click="addToCart('{{ product.name }}', {{ product.price }})"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition active:scale-95">
+                                    + Adicionar
+                                </button>
+                            </div>
+                        {% endif %}
+                    {% empty %}
+                        <p class="text-sm text-gray-400">Nenhum produto nesta categoria.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        {% empty %}
+            <p class="text-center text-gray-500 mt-8">Cardápio em atualização.</p>
+        {% endfor %}
+    </main>
+
+    <!-- Barra Fixa Inferior (Carrinho) -->
+    <div x-show="cart.length > 0" 
+         x-transition
+         class="fixed bottom-0 left-0 right-0 bg-white border-t p-4 shadow-lg z-40">
+        <div class="max-w-2xl mx-auto flex justify-between items-center">
+            <div>
+                <p class="text-xs text-gray-500" x-text="`${totalItems()} item(ns)`"></p>
+                <p class="text-lg font-bold text-gray-900" x-text="`Total: R$ ${grandTotal().toFixed(2)}`"></p>
+            </div>
+            <button 
+                @click="openModal = true"
+                class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shadow-md">
+                <span>Ver Pedido</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Checkout -->
+    <div x-show="openModal" 
+         class="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+         x-cloak>
+        <div @click.away="openModal = false" 
+             class="bg-white w-full max-w-lg rounded-t-2xl sm:rounded-2xl p-6 max-h-[90vh] overflow-y-auto space-y-4">
+            
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-bold text-gray-900">Finalizar Pedido</h3>
+                <button @click="openModal = false" class="text-gray-400 font-bold text-xl">&times;</button>
+            </div>
+
+            <!-- Itens do Carrinho -->
+            <div class="space-y-3">
+                <template x-for="(item, index) in cart" :key="index">
+                    <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                        <div>
+                            <p class="font-semibold text-sm" x-text="item.name"></p>
+                            <p class="text-xs text-gray-500" x-text="`R$ ${item.price.toFixed(2)}`"></p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button @click="decreaseQty(index)" class="w-7 h-7 bg-gray-200 rounded-full font-bold">-</button>
+                            <span class="text-sm font-semibold" x-text="item.qty"></span>
+                            <button @click="increaseQty(index)" class="w-7 h-7 bg-gray-200 rounded-full font-bold">+</button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Dados do Cliente e Bairro -->
+            <div class="space-y-3 pt-2">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Seu Nome *</label>
+                    <input type="text" x-model="customerName" placeholder="Ex: João Silva" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                </div>
+
+                <!-- Seleção de Bairro -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Bairro de Entrega *</label>
+                    <select x-model="selectedFee" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500 outline-none">
+                        <option value="0">Selecione seu bairro...</option>
+                        {% for fee in delivery_fees %}
+                            <option value="{{ fee.fee }}">{{ fee.neighborhood }} (R$ {{ fee.fee }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Rua, Número e Complemento *</label>
+                    <textarea x-model="address" placeholder="Rua das Flores, 123, Apt 4" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-red-500 outline-none" rows="2"></textarea>
+                </div>
+
+                <!-- Forma de Pagamento -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Forma de Pagamento *</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" @click="paymentMethod = 'PIX'" :class="paymentMethod === 'PIX' ? 'border-green-600 bg-green-50 text-green-700 font-bold' : 'border-gray-200'" class="border rounded-lg p-2 text-xs text-center transition">
+                            📱 PIX
+                        </button>
+                        <button type="button" @click="paymentMethod = 'Dinheiro/Cartão'" :class="paymentMethod === 'Dinheiro/Cartão' ? 'border-green-600 bg-green-50 text-green-700 font-bold' : 'border-gray-200'" class="border rounded-lg p-2 text-xs text-center transition">
+                            💵 Dinheiro/Cartão na Entrega
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumo Financeiro -->
+            <div class="bg-gray-50 p-3 rounded-lg text-xs space-y-1">
+                <div class="flex justify-between text-gray-500">
+                    <span>Subtotal:</span>
+                    <span>R$ <span x-text="subtotal().toFixed(2)"></span></span>
+                </div>
+                <div class="flex justify-between text-gray-500">
+                    <span>Taxa de Entrega:</span>
+                    <span>R$ <span x-text="parseFloat(selectedFee).toFixed(2)"></span></span>
+                </div>
+                <div class="flex justify-between font-bold text-sm text-gray-900 border-t pt-1">
+                    <span>Total do Pedido:</span>
+                    <span>R$ <span x-text="grandTotal().toFixed(2)"></span></span>
+                </div>
+            </div>
+
+            <!-- Botão Enviar Pedido -->
+            <button 
+                @click="sendWhatsAppOrder('{{ restaurant.whatsapp_number }}')"
+                :disabled="!customerName || !address || selectedFee == 0 || cart.length === 0 || loading"
+                class="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-xl transition shadow-md flex justify-center items-center gap-2">
+                <span x-show="!loading">Enviar Pedido pelo WhatsApp</span>
+                <span x-show="loading">A processar pedido...</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Script Alpine.js -->
+    <script>
+        function cartApp() {
+            return {
+                cart: [],
+                openModal: false,
+                customerName: '',
+                address: '',
+                selectedFee: 0,
+                paymentMethod: 'PIX',
+                loading: false,
+
+                addToCart(name, price) {
+                    const existing = this.cart.find(i => i.name === name);
+                    if (existing) {
+                        existing.qty++;
+                    } else {
+                        this.cart.push({ name, price: parseFloat(price), qty: 1 });
+                    }
+                },
+                increaseQty(index) {
+                    this.cart[index].qty++;
+                },
+                decreaseQty(index) {
+                    if (this.cart[index].qty > 1) {
+                        this.cart[index].qty--;
+                    } else {
+                        this.cart.splice(index, 1);
+                    }
+                },
+                totalItems() {
+                    return this.cart.reduce((sum, item) => sum + item.qty, 0);
+                },
+                subtotal() {
+                    return this.cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+                },
+                grandTotal() {
+                    return this.subtotal() + parseFloat(this.selectedFee || 0);
+                },
+                async sendWhatsAppOrder(phone) {
+                    this.loading = true;
+
+                    const fullAddress = `${this.address} (Taxa Entrega: R$ ${parseFloat(this.selectedFee).toFixed(2)})`;
+
+                    const payload = {
+                        customer_name: this.customerName,
+                        customer_phone: '',
+                        address: fullAddress,
+                        total_amount: this.grandTotal(),
+                        items: this.cart
+                    };
+
+                    try {
+                        const res = await fetch(`/${'{{ restaurant.slug }}'}/api/order/`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const data = await res.json();
+                        const orderId = data.success ? `#${data.order_id}` : '';
+
+                        let text = `*NOVO PEDIDO ${orderId} - {{ restaurant.name }}*\n\n`;
+                        text += `*Cliente:* ${this.customerName}\n`;
+                        text += `*Endereço:* ${fullAddress}\n`;
+                        text += `*Pagamento:* ${this.paymentMethod}\n\n`;
+                        text += `*ITENS DO PEDIDO:*\n`;
+
+                        this.cart.forEach(item => {
+                            text += `• ${item.qty}x ${item.name} - R$ ${(item.price * item.qty).toFixed(2)}\n`;
+                        });
+
+                        text += `\n🛵 *Taxa de Entrega:* R$ ${parseFloat(this.selectedFee).toFixed(2)}`;
+                        text += `\n*TOTAL: R$ ${this.grandTotal().toFixed(2)}*`;
+
+                        const encodedText = encodeURIComponent(text);
+                        const cleanPhone = phone.replace(/\D/g, '');
+                        window.open(`https://wa.me/${cleanPhone}?text=${encodedText}`, '_blank');
+
+                    } catch (error) {
+                        alert('Ocorreu um erro ao registar o pedido. Por favor, tente novamente.');
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

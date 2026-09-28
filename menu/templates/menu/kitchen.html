@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Pedidos - {{ restaurant.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-6">
+
+    <header class="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-red-500">Gestor de Pedidos - {{ restaurant.name }}</h1>
+            <p class="text-xs text-gray-400">Atualização em tempo real</p>
+        </div>
+        <button onclick="location.reload()" class="bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm">
+            🔄 Atualizar
+        </button>
+    </header>
+
+    <!-- Lista de Pedidos estilo Kanban / Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for order in orders %}
+            <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg flex flex-col justify-between" id="order-card-{{ order.id }}">
+                <div>
+                    <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-3">
+                        <span class="font-bold text-lg text-yellow-400">#{{ order.id|stringformat:".8s" }}</span>
+                        <span class="text-xs px-2.5 py-1 rounded-full font-semibold
+                            {% if order.status == 'PENDING' %}bg-yellow-500/20 text-yellow-400
+                            {% elif order.status == 'PREPARING' %}bg-blue-500/20 text-blue-400
+                            {% elif order.status == 'DISPATCHED' %}bg-purple-500/20 text-purple-400
+                            {% elif order.status == 'COMPLETED' %}bg-green-500/20 text-green-400
+                            {% else %}bg-red-500/20 text-red-400{% endif %}">
+                            {{ order.get_status_display }}
+                        </span>
+                    </div>
+
+                    <div class="text-sm space-y-1 mb-4">
+                        <p class="font-semibold text-white">👤 {{ order.customer_name }}</p>
+                        <p class="text-xs text-gray-400">📍 {{ order.address }}</p>
+                        <p class="text-xs text-gray-400">🕒 {{ order.created_at|date:"H:i" }} hs</p>
+                    </div>
+
+                    <!-- Itens do Pedido -->
+                    <div class="bg-gray-900/50 rounded-lg p-3 space-y-2 text-xs mb-4">
+                        {% for item in order.items.all %}
+                            <div class="flex justify-between text-gray-300">
+                                <span>{{ item.quantity }}x {{ item.product.name }}</span>
+                                <span>R$ {{ item.get_subtotal }}</span>
+                            </div>
+                        {% endfor %}
+                        <div class="border-t border-gray-800 pt-2 flex justify-between font-bold text-sm text-green-400">
+                            <span>Total</span>
+                            <span>R$ {{ order.total_amount }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Troca de Status -->
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-700">
+                    {% if order.status == 'PENDING' %}
+                        <button onclick="changeStatus('{{ order.id }}', 'PREPARING')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg text-xs col-span-2">
+                            ▶ Iniciar Preparo
+                        </button>
+                    {% elif order.status == 'PREPARING' %}
+                        <button onclick="changeStatus('{{ order.id }}', 'DISPATCHED')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded-lg text-xs col-span-2">
+                            🛵 Saiu para Entrega
+                        </button>
+                    {% elif order.status == 'DISPATCHED' %}
+                        <button onclick="changeStatus('{{ order.id }}', 'COMPLETED')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg text-xs col-span-2">
+                            ✓ Concluir Pedido
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        {% empty %}
+            <p class="text-gray-500 text-center col-span-full py-12">Nenhum pedido recebido ainda.</p>
+        {% endfor %}
+    </div>
+
+    <script>
+        function changeStatus(orderId, newStatus) {
+            fetch(`/api/order/${orderId}/status/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) location.reload();
+            });
+        }
+    </script>
+</body>
+</html>

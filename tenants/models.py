@@ -1,7 +1,9 @@
 import uuid
 from django.db import models
+from django.contrib.auth.models import User
 
 class Restaurant(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='restaurants')
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField('Nome do Restaurante', max_length=120)
     slug = models.SlugField('Slug / Subdomínio URL', unique=True, help_text='Ex: pizzaria-do-mario')

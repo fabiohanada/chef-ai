@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selecione sua Loja | Chef AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-8 text-center border border-slate-100">
+        <h1 class="text-2xl font-bold text-slate-800 mb-2">Qual loja deseja acessar?</h1>
+        <p class="text-slate-500 text-sm mb-6">Identificamos que você gerencia múltiplos estabelecimentos.</p>
+        
+        <div class="space-y-3 text-left">
+            {% for restaurant in restaurants %}
+            <a href="/{{ restaurant.slug }}/cozinha/" class="block p-4 border border-slate-200 rounded-xl hover:border-blue-600 hover:bg-blue-50 transition duration-200 shadow-sm">
+                <div class="font-semibold text-slate-800">{{ restaurant.name }}</div>
+                <div class="text-xs text-slate-400 mt-1">Acessar painel do restaurante</div>
+            </a>
+            {% endfor %}
+        </div>
+
+        <div class="mt-8 pt-4 border-t border-slate-100">
+            <a href="{% url 'logout' %}" class="text-sm text-red-500 hover:text-red-700 font-medium hover:underline transition">Sair da conta</a>
+        </div>
+    </div>
+</body>
+</html>

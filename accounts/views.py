@@ -10,32 +10,49 @@ from menu.models import Restaurant  # Importa o modelo do Restaurante (ajusta o 
 from django.utils.text import slugify
 
 def login_view(request):
-    # Se já estiver logado, redireciona para a cozinha do restaurante dele
+    # Lógica para usuário que já está logado na sessão
     if request.user.is_authenticated:
-        restaurant = Restaurant.objects.filter(user=request.user).first()
-        if restaurant:
-            return redirect(f'/{restaurant.slug}/cozinha/')
-        return redirect('/cadastro/')  # Redirecionamento padrão caso não tenha restaurante associado
+        if request.user.is_superuser:
+            return redirect('/admin/')
+            
+        restaurants = Restaurant.objects.filter(user=request.user)
+        
+        if restaurants.count() == 1:
+            return redirect(f'/{restaurants.first().slug}/cozinha/')
+        elif restaurants.count() > 1:
+            # Se tem mais de 1 loja, manda para o Seletor
+            return render(request, 'accounts/select_store.html', {'restaurants': restaurants})
+        else:
+            return redirect('/cadastro/') 
 
     if request.method == 'POST':
         email_or_username = request.POST.get('username')
         password = request.POST.get('password')
 
+        # 🚀 NOVA LÓGICA: Se o texto tiver '@', é um e-mail! Vamos descobrir o username dele.
+        if '@' in email_or_username:
+            user_obj = User.objects.filter(email=email_or_username).first()
+            if user_obj:
+                email_or_username = user_obj.username  # Troca o e-mail pelo username real para o Django aceitar
+
+        # Agora o Django faz a autenticação com o username correto
         user = authenticate(request, username=email_or_username, password=password)
         
         if user is not None:
             login(request, user)
-            messages.success(request, 'Login efetuado com sucesso!')
             
-            # Procura o restaurante do utilizador logado
-            restaurant = Restaurant.objects.filter(user=user).first()
-            if restaurant:
-                return redirect(f'/{restaurant.slug}/cozinha/')
+            if user.is_superuser:
+                return redirect('/admin/')
             
-            # Se for um superuser sem restaurante específico, pode redirecionar para um padrão
-            return redirect('/restaurante-demo/cozinha/')
+            restaurants = Restaurant.objects.filter(user=user)
+            if restaurants.count() == 1:
+                return redirect(f'/{restaurants.first().slug}/cozinha/')
+            elif restaurants.count() > 1:
+                return render(request, 'accounts/select_store.html', {'restaurants': restaurants})
+            else:
+                return redirect('/cadastro/')
         else:
-            messages.error(request, 'E-mail, chave ou senha inválidos.')
+            messages.error(request, 'E-mail, usuário ou senha inválidos.')
 
     return render(request, 'accounts/login.html')
 
@@ -83,7 +100,8 @@ def register_view(request):
         restaurant = Restaurant.objects.create(
             name=restaurant_name,
             slug=slug,
-            user=user
+            user=user,
+            whatsapp_number=phone
         )
 
         # 6. Fazer login automático e redirecionar

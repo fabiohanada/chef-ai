@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Gestão - {{ restaurant.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <!-- Cabeçalho Principal -->
+    <header class="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">Gestão do Cardápio</h1>
+            <p class="text-sm text-gray-500">{{ restaurant.name }}</p>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <!-- Botão para a Gestão de Pedidos (Cozinha) -->
+            <a href="{% url 'kitchen_dashboard' restaurant.slug %}" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                🍳 Gestão de Pedidos
+            </a>
+            
+            <div class="w-px h-6 bg-gray-300"></div>
+            
+            <a href="{% url 'logout' %}" class="text-sm text-gray-600 hover:text-red-600 font-medium transition">Sair</a>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal: O Cardápio Editável -->
+    <main class="max-w-5xl mx-auto px-4">
+        
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-gray-800">Suas Categorias e Produtos</h2>
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+                + Nova Categoria
+            </button>
+        </div>
+
+        {% for category in categories %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+            
+            <!-- Cabeçalho da Categoria -->
+            <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="font-bold text-gray-800 text-lg">{{ category.name }}</h3>
+                <div class="flex gap-2">
+                    <button class="text-sm text-blue-600 hover:underline">Editar Categoria</button>
+                    <button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition">
+                        + Novo Produto
+                    </button>
+                </div>
+            </div>
+
+            <!-- Lista de Produtos -->
+            <div class="divide-y divide-gray-100">
+                {% for product in category.products.all %}
+                <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition">
+                    <div>
+                        <p class="font-semibold text-gray-800">{{ product.name }}</p>
+                        <p class="text-sm text-gray-500">{{ product.description|truncatechars:50 }}</p>
+                        <p class="text-green-600 font-bold mt-1">R$ {{ product.price }}</p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Editar</button>
+                        <button class="text-sm text-red-600 hover:text-red-800 font-medium">Excluir</button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    Nenhum produto cadastrado nesta categoria.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">Seu cardápio está vazio</h3>
+            <p class="text-gray-500 mb-4">Comece criando a sua primeira categoria de produtos.</p>
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                Criar Primeira Categoria
+            </button>
+        </div>
+        {% endfor %}
+
+    </main>
+</body>
+</html>

@@ -8,4 +8,5 @@ urlpatterns = [
     path('api/order/<uuid:order_id>/status/', views.update_order_status, name='update_order_status'),
     # Rota do Webhook do Bot do WhatsApp
     path('<slug:slug>/webhook/whatsapp/', views_webhook.whatsapp_webhook, name='whatsapp_webhook'),
+    path('<slug:slug>/admin-cardapio/', views.restaurant_admin, name='restaurant_admin'),
 ]

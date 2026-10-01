@@ -1,5 +1,6 @@
 import json
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from tenants.models import Restaurant
@@ -53,11 +54,18 @@ def create_order_api(request, slug):
 # Painel do Gestor / Cozinha (PDV/KDS)
 def kitchen_dashboard(request, slug):
     restaurant = get_object_or_404(Restaurant, slug=slug)
-    orders = Order.objects.filter(restaurant=restaurant).order_by('-created_at')[:30]
+    
+    # 1. Pedidos ATIVOS (Exclui os concluídos e cancelados da tela de produção)
+    # ATENÇÃO: Verifique se no seu models.py os status estão em maiúsculas (ex: 'COMPLETED', 'CANCELED') ou minúsculas.
+    active_orders = Order.objects.filter(restaurant=restaurant).exclude(status__in=['concluido', 'cancelado', 'COMPLETED', 'CANCELED']).order_by('created_at')
+    
+    # 2. TODOS os pedidos (Para a tabela de histórico, do mais recente para o mais antigo)
+    all_orders = Order.objects.filter(restaurant=restaurant).order_by('-created_at')
     
     context = {
         'restaurant': restaurant,
-        'orders': orders,
+        'active_orders': active_orders, # Passa os ativos para os cartões
+        'all_orders': all_orders,       # Passa o histórico para a tabela
     }
     return render(request, 'menu/kitchen.html', context)
 
@@ -117,3 +125,14 @@ def create_order_api(request, slug):
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
             
     return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+@login_required
+def restaurant_admin(request, slug):
+    restaurant = get_object_or_404(Restaurant, slug=slug, user=request.user)
+    categories = Category.objects.filter(restaurant=restaurant).prefetch_related('products')
+    
+    context = {
+        'restaurant': restaurant,
+        'categories': categories,
+    }
+    return render(request, 'menu/admin_cardapio.html', context)

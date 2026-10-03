@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from tenants.models import Restaurant
 from .models import Category, Product, Order, OrderItem, DeliveryFee
+from tenants.forms import RestaurantProfileForm
 
 # View do Cardápio Digital
 def restaurant_menu(request, slug):
@@ -131,8 +132,20 @@ def restaurant_admin(request, slug):
     restaurant = get_object_or_404(Restaurant, slug=slug, user=request.user)
     categories = Category.objects.filter(restaurant=restaurant).prefetch_related('products')
     
+    # --- NOVA LÓGICA DO FORMULÁRIO AQUI ---
+    if request.method == 'POST' and 'update_profile' in request.POST:
+        profile_form = RestaurantProfileForm(request.POST, instance=restaurant)
+        if profile_form.is_valid():
+            profile_form.save()
+            return redirect('restaurant_admin', slug=slug)
+    else:
+        # Carrega o formulário já preenchido com os dados atuais da loja
+        profile_form = RestaurantProfileForm(instance=restaurant)
+    # --------------------------------------
+    
     context = {
         'restaurant': restaurant,
         'categories': categories,
+        'profile_form': profile_form, # Passamos o formulário para o template
     }
     return render(request, 'menu/admin_cardapio.html', context)

@@ -30,6 +30,56 @@
     <!-- Conteúdo Principal: O Cardápio Editável -->
     <main class="max-w-5xl mx-auto px-4">
         
+        <!-- Seção: Perfil da Loja (Novo) -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+            <div class="bg-gray-800 px-6 py-4">
+                <h2 class="text-lg font-bold text-white">⚙️ Configurações da Loja (Perfil)</h2>
+            </div>
+            
+            <form method="POST" class="p-6">
+                {% csrf_token %}
+                <!-- Este input escondido avisa a view que estamos a gravar o perfil -->
+                <input type="hidden" name="update_profile" value="1">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Loja</label>
+                        {{ profile_form.name }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Pedido Mínimo (R$)</label>
+                        {{ profile_form.minimum_order_value }}
+                    </div>
+                </div>
+
+                <h3 class="text-md font-bold text-gray-700 mt-6 mb-3 border-b pb-2">📍 Endereço</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Rua e Número</label>
+                        {{ profile_form.address }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                        {{ profile_form.city }}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                        {{ profile_form.state }}
+                    </div>
+                    <div class="md:col-span-1">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">CEP</label>
+                        {{ profile_form.zip_code }}
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                        Guardar Configurações
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800">Suas Categorias e Produtos</h2>
             <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">

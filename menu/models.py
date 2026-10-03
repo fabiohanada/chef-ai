@@ -22,6 +22,7 @@ class Product(models.Model):
     price = models.DecimalField('Preço (R$)', max_digits=10, decimal_places=2)
     image_url = models.URLField('URL da Imagem', blank=True, null=True)
     is_available = models.BooleanField('Disponível', default=True)
+    image = models.ImageField("Foto do Produto", upload_to='product_images/', blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} (R$ {self.price})"

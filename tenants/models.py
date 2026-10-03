@@ -15,6 +15,7 @@ class Restaurant(models.Model):
     state = models.CharField("Estado", max_length=2, blank=True, null=True)
     zip_code = models.CharField("CEP", max_length=9, blank=True, null=True)
     minimum_order_value = models.DecimalField("Pedido Mínimo", max_digits=6, decimal_places=2, default=0.00)
+    logo = models.ImageField("Logótipo", upload_to='restaurant_logos/', blank=True, null=True)
 
 class OperatingHours(models.Model):
     DAYS_OF_WEEK = [

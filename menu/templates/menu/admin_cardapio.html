@@ -36,16 +36,31 @@
                 <h2 class="text-lg font-bold text-white">⚙️ Configurações da Loja (Perfil)</h2>
             </div>
             
-            <form method="POST" class="p-6">
+            <form method="POST" enctype="multipart/form-data" class="p-6">
                 {% csrf_token %}
                 <!-- Este input escondido avisa a view que estamos a gravar o perfil -->
                 <input type="hidden" name="update_profile" value="1">
                 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <!-- Mudamos para md:grid-cols-3 para caber os 3 campos lado a lado -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Nome da Loja</label>
                         {{ profile_form.name }}
                     </div>
+                    
+                    <!-- NOVO CAMPO: Logótipo -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Logótipo</label>
+                        {{ profile_form.logo }}
+                        
+                        <!-- Se já houver um logótipo salvo, mostramos uma miniatura -->
+                        {% if restaurant.logo %}
+                        <div class="mt-2">
+                            <img src="{{ restaurant.logo.url }}" alt="Logótipo atual" class="h-10 w-10 rounded-full object-cover border border-gray-300">
+                        </div>
+                        {% endif %}
+                    </div>
+                    
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Pedido Mínimo (R$)</label>
                         {{ profile_form.minimum_order_value }}
@@ -80,11 +95,90 @@
             </form>
         </div>
 
+        <!-- Seção: Formas de Pagamento -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+            <div class="bg-gray-800 px-6 py-4">
+                <h2 class="text-lg font-bold text-white">💳 Formas de Pagamento Aceites</h2>
+            </div>
+            
+            <form method="POST" class="p-6">
+                {% csrf_token %}
+                <input type="hidden" name="update_payments" value="1">
+                
+                <p class="text-sm text-gray-500 mb-4">Selecione as formas de pagamento que estarão disponíveis para o cliente no momento de finalizar o pedido.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for pm in payment_methods %}
+                    <label class="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition {% if pm.is_active %}border-green-500 bg-green-50{% else %}border-gray-200{% endif %}">
+                        <input type="checkbox" name="payments" value="{{ pm.id }}" class="w-5 h-5 text-green-600 rounded border-gray-300 focus:ring-green-500" {% if pm.is_active %}checked{% endif %}>
+                        <div class="ml-3">
+                            <span class="block text-sm font-medium text-gray-900">{{ pm.name }}</span>
+                            <span class="block text-xs text-gray-500">{{ pm.get_category_display }}</span>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="flex justify-end mt-6">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                        Guardar Pagamentos
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Seção: Horários de Funcionamento -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+            <div class="bg-gray-800 px-6 py-4">
+                <h2 class="text-lg font-bold text-white">🕒 Horários de Funcionamento</h2>
+            </div>
+            
+            <form method="POST" class="p-6">
+                {% csrf_token %}
+                <input type="hidden" name="update_hours" value="1">
+                
+                <p class="text-sm text-gray-500 mb-4">Defina o horário de abertura e fecho para cada dia. Marque a caixa "Fechado" nos dias em que a loja não opera.</p>
+                
+                <div class="space-y-4">
+                    {% for hour in operating_hours %}
+                    <div class="flex flex-wrap md:flex-nowrap items-center justify-between p-4 border rounded-lg {% if hour.is_closed %}bg-red-50 border-red-200{% endif %}">
+                        
+                        <!-- Dia da Semana -->
+                        <div class="w-full md:w-1/4 font-bold text-gray-700 mb-2 md:mb-0">
+                            {{ hour.get_day_display }}
+                        </div>
+                        
+                        <!-- Caixas de Hora -->
+                        <div class="flex items-center space-x-2 md:space-x-4 w-full md:w-1/2 justify-start md:justify-center mb-2 md:mb-0">
+                            <input type="time" name="opening_{{ hour.id }}" value="{{ hour.opening_time|time:'H:i' }}" class="border rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white" {% if hour.is_closed %}disabled{% endif %}>
+                            <span class="text-gray-500 font-medium">até</span>
+                            <input type="time" name="closing_{{ hour.id }}" value="{{ hour.closing_time|time:'H:i' }}" class="border rounded p-2 text-sm focus:ring-blue-500 focus:border-blue-500 bg-white" {% if hour.is_closed %}disabled{% endif %}>
+                        </div>
+
+                        <!-- Botão Fechado -->
+                        <div class="w-full md:w-1/4 flex md:justify-end items-center">
+                            <label class="flex items-center cursor-pointer bg-white px-3 py-2 border rounded-lg hover:bg-gray-50 transition">
+                                <input type="checkbox" name="is_closed_{{ hour.id }}" class="w-5 h-5 text-red-600 rounded border-gray-300 focus:ring-red-500 mr-2" {% if hour.is_closed %}checked{% endif %}>
+                                <span class="text-sm font-bold {% if hour.is_closed %}text-red-600{% else %}text-gray-600{% endif %}">Fechado hoje</span>
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="flex justify-end mt-6">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                        Guardar Horários
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800">Suas Categorias e Produtos</h2>
-            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <a href="{% url 'create_category' restaurant.slug %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition inline-block">
                 + Nova Categoria
-            </button>
+            </a>
         </div>
 
         {% for category in categories %}
@@ -93,11 +187,15 @@
             <!-- Cabeçalho da Categoria -->
             <div class="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
                 <h3 class="font-bold text-gray-800 text-lg">{{ category.name }}</h3>
-                <div class="flex gap-2">
-                    <button class="text-sm text-blue-600 hover:underline">Editar Categoria</button>
-                    <button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs font-medium transition">
+                
+                <!-- PARTE A: Links de Editar/Excluir Categoria -->
+                <div class="flex gap-2 items-center">
+                    <a href="{% url 'edit_category' restaurant.slug category.id %}" class="text-sm text-blue-600 hover:underline">Editar</a>
+                    <a href="{% url 'delete_category' restaurant.slug category.id %}" onclick="return confirm('Tem a certeza? Isto vai apagar a categoria e TODOS os produtos dentro dela!');" class="text-sm text-red-600 hover:underline mr-3">Excluir</a>
+                    
+                    <a href="{% url 'create_product' restaurant.slug category.id %}" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-medium transition">
                         + Novo Produto
-                    </button>
+                    </a>
                 </div>
             </div>
 
@@ -105,15 +203,31 @@
             <div class="divide-y divide-gray-100">
                 {% for product in category.products.all %}
                 <div class="px-6 py-4 flex justify-between items-center hover:bg-gray-50 transition">
-                    <div>
-                        <p class="font-semibold text-gray-800">{{ product.name }}</p>
-                        <p class="text-sm text-gray-500">{{ product.description|truncatechars:50 }}</p>
-                        <p class="text-green-600 font-bold mt-1">R$ {{ product.price }}</p>
+                    
+                    <div class="flex items-center gap-4">
+                        <!-- Miniatura da Foto do Produto -->
+                        {% if product.image %}
+                            <img src="{{ product.image.url }}" alt="{{ product.name }}" class="w-16 h-16 object-cover rounded-lg border border-gray-200">
+                        {% else %}
+                            <div class="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center">
+                                <span class="text-gray-400 text-xs text-center leading-tight">Sem<br>foto</span>
+                            </div>
+                        {% endif %}
+                        
+                        <!-- Dados do Produto -->
+                        <div>
+                            <p class="font-semibold text-gray-800">{{ product.name }}</p>
+                            <p class="text-sm text-gray-500">{{ product.description|truncatechars:50 }}</p>
+                            <p class="text-green-600 font-bold mt-1">R$ {{ product.price }}</p>
+                        </div>
                     </div>
-                    <div class="flex gap-3">
-                        <button class="text-sm text-blue-600 hover:text-blue-800 font-medium">Editar</button>
-                        <button class="text-sm text-red-600 hover:text-red-800 font-medium">Excluir</button>
+                    
+                    <!-- PARTE B: Links de Editar/Excluir Produto -->
+                    <div class="flex gap-3 items-center">
+                        <a href="{% url 'edit_product' restaurant.slug product.id %}" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Editar</a>
+                        <a href="{% url 'delete_product' restaurant.slug product.id %}" onclick="return confirm('Tem a certeza que deseja excluir o produto {{ product.name }}?');" class="text-sm text-red-600 hover:text-red-800 font-medium">Excluir</a>
                     </div>
+                    
                 </div>
                 {% empty %}
                 <div class="px-6 py-8 text-center text-gray-500">
@@ -123,12 +237,13 @@
             </div>
         </div>
         {% empty %}
+        <!-- Caso o cardápio não tenha categorias -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-            <h3 class="text-lg font-bold text-gray-800 mb-2">Seu cardápio está vazio</h3>
-            <p class="text-gray-500 mb-4">Comece criando a sua primeira categoria de produtos.</p>
-            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">O seu cardápio está vazio</h3>
+            <p class="text-gray-500 mb-4">Comece por criar a sua primeira categoria de produtos.</p>
+            <a href="{% url 'create_category' restaurant.slug %}" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition inline-block">
                 Criar Primeira Categoria
-            </button>
+            </a>
         </div>
         {% endfor %}
 

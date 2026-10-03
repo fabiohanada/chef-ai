@@ -9,11 +9,97 @@
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 pb-24" x-data="cartApp()">
 
-    <!-- Header / Info da Loja -->
-    <header class="bg-red-600 text-white p-6 shadow-md text-center">
-        <h1 class="text-2xl font-bold">{{ restaurant.name }}</h1>
-        <p class="text-sm mt-1 opacity-90">Faça seu pedido diretamente pelo WhatsApp</p>
-    </header>
+    <!-- Tarja de Loja Fechada -->
+    {% if not is_open %}
+    <div class="bg-red-600 text-white text-center py-2 text-sm font-medium sticky top-0 z-50 shadow-md">
+        ⚠️ A loja está fechada no momento. Pode ver o cardápio, mas não poderá enviar pedidos.
+    </div>
+    {% endif %}
+
+    <!-- Cabeçalho da Loja Limpo e Organizado -->
+    <div class="bg-white border-b border-gray-200 mb-8 pb-6">
+        <!-- Capa (Fundo escuro) -->
+        <div class="h-32 bg-gray-800 w-full"></div>
+        
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+            <!-- Logótipo (Puxado para cima, sobrepondo a capa) -->
+            <div class="-mt-12 sm:-mt-16 flex justify-start">
+                <div class="relative h-24 w-24 sm:h-32 sm:w-32 rounded-full border-4 border-white bg-white overflow-hidden shadow-md">
+                    {% if restaurant.logo %}
+                        <img class="h-full w-full object-cover" src="{{ restaurant.logo.url }}" alt="{{ restaurant.name }}">
+                    {% else %}
+                        <div class="h-full w-full bg-gray-200 flex items-center justify-center">
+                            <span class="text-gray-500 text-4xl font-bold">{{ restaurant.name|make_list|first|upper }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Informações da Loja (Agora com horários expansíveis) -->
+            <div class="mt-4 flex flex-col sm:flex-row sm:items-start justify-between w-full">
+                <div class="flex-1">
+                    <h1 class="text-3xl font-bold text-gray-900">{{ restaurant.name }}</h1>
+                    
+                    <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
+                        📍 {% if restaurant.address %}{{ restaurant.address }}, {{ restaurant.city }}{% else %}Endereço não cadastrado{% endif %}
+                    </p>
+                    
+                    <!-- Secção de Horários (Expansível) -->
+                    <details class="mt-2 group cursor-pointer">
+                        <summary class="text-sm text-gray-600 flex items-center gap-1 list-none font-medium outline-none">
+                            🕒 Hoje: 
+                            {% if today_hours %}
+                                {% if today_hours.is_closed %}
+                                    <span class="text-red-600 font-bold">Fechado</span>
+                                {% else %}
+                                    {{ today_hours.opening_time|time:"H:i" }} às {{ today_hours.closing_time|time:"H:i" }}
+                                {% endif %}
+                            {% else %}
+                                Horário não definido
+                            {% endif %} 
+                            <span class="ml-2 text-blue-600 hover:text-blue-800 hover:underline text-xs transition">
+                                (Ver horários da semana ▼)
+                            </span>
+                        </summary>
+                        
+                        <!-- Caixinha com a lista da semana inteira -->
+                        <div class="mt-3 mb-2 bg-gray-50 border border-gray-200 rounded-lg p-4 max-w-xs shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">Horários de Funcionamento</h4>
+                            <ul class="space-y-2 text-sm text-gray-700">
+                                {% for hour in all_hours %}
+                                <li class="flex justify-between items-center border-b border-gray-100 pb-1 last:border-0 last:pb-0">
+                                    <span class="font-medium text-gray-600">{{ hour.get_day_display }}</span>
+                                    {% if hour.is_closed %}
+                                        <span class="text-red-500 font-bold text-xs bg-red-50 px-2 py-1 rounded">Fechado</span>
+                                    {% else %}
+                                        <span class="text-gray-800 font-mono text-xs">{{ hour.opening_time|time:"H:i" }} - {{ hour.closing_time|time:"H:i" }}</span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </details>
+
+                    <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
+                        💰 Pedido Mín: R$ {{ restaurant.minimum_order_value }}
+                    </p>
+                </div>
+                
+                <!-- Botão de Status (Aberto/Fechado) -->
+                <div class="mt-4 sm:mt-0 flex-shrink-0">
+                    {% if is_open %}
+                        <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-green-100 text-green-800 border border-green-200 shadow-sm">
+                            <span class="w-2 h-2 mr-2 bg-green-500 rounded-full animate-pulse"></span> Aberto
+                        </span>
+                    {% else %}
+                        <span class="inline-flex items-center px-4 py-2 rounded-full text-sm font-bold bg-gray-100 text-gray-800 border border-gray-200 shadow-sm">
+                            <span class="w-2 h-2 mr-2 bg-gray-500 rounded-full"></span> Fechado
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Cardápio / Categorias -->
     <main class="max-w-2xl mx-auto p-4 space-y-6">

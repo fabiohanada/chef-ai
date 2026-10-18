@@ -16,6 +16,22 @@ class Restaurant(models.Model):
     zip_code = models.CharField("CEP", max_length=9, blank=True, null=True)
     minimum_order_value = models.DecimalField("Pedido Mínimo", max_digits=6, decimal_places=2, default=0.00)
     logo = models.ImageField("Logótipo", upload_to='restaurant_logos/', blank=True, null=True)
+    
+    # --- NOVOS CAMPOS DE ASSINATURA (SaaS) ---
+    PLAN_CHOICES = [
+        ('BASIC', 'Plano Básico'),
+        ('PRO', 'Plano Profissional'),
+        ('PREMIUM', 'Plano Premium'),
+    ]
+    STATUS_PAGAMENTO_CHOICES = [
+        ('ACTIVE', 'Ativo'),
+        ('OVERDUE', 'Atraso'),
+    ]
+    
+    plan = models.CharField('Plano', max_length=20, choices=PLAN_CHOICES, default='PRO')
+    subscription_status = models.CharField('Status', max_length=20, choices=STATUS_PAGAMENTO_CHOICES, default='ACTIVE')
+    due_date = models.DateField('Data de Vencimento', blank=True, null=True)
+    monthly_fee = models.DecimalField('Valor da Mensalidade (R$)', max_digits=8, decimal_places=2, default=99.90)
 
 class OperatingHours(models.Model):
     DAYS_OF_WEEK = [
@@ -49,3 +65,4 @@ class PaymentMethod(models.Model):
 
     def __str__(self):
         return f"{self.restaurant.name} - {self.name}"
+    

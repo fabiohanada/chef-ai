@@ -1,6 +1,16 @@
-*.pyc
-__pycache__/
-db.sqlite3
-.env
+# Ambientes Virtuais
 venv/
-.vscode/
+env/
+
+# Ficheiros compilados do Python
+__pycache__/
+*.pyc
+
+# Base de Dados Local
+db.sqlite3
+
+# Ficheiros de Mídia (Imagens de produtos/logotipos testados localmente)
+media/
+
+# Variáveis de ambiente (se usares no futuro)
+.env

@@ -14,6 +14,10 @@
         </div>
         <!-- Grupo de Botões de Ação -->
         <div class="flex items-center gap-3">
+            <!-- NOVO BOTÃO FINANCEIRO -->
+            <a href="{% url 'financial_dashboard' restaurant.slug %}" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2">
+                📊 Financeiro
+            </a>
             <!-- NOVO: Botão Editar Cardápio -->
             <a href="{% url 'restaurant_admin' restaurant.slug %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition font-bold">
                 📝 Editar Cardápio
@@ -23,11 +27,13 @@
                 <span>🔄</span> Atualizar
             </button>
             
+            {% if has_multiple_stores %}
             <!-- Botão Trocar de Loja -->
             <a href="{% url 'login' %}" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                 Trocar Loja
             </a>
+            {% endif %}
             
             <!-- Botão de Sair (Logout) -->
             <a href="{% url 'logout' %}" class="bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition">
@@ -45,7 +51,7 @@
             <div class="bg-gray-800 border border-gray-700 rounded-xl p-5 shadow-lg flex flex-col justify-between" id="order-card-{{ order.id }}">
                 <div>
                     <div class="flex justify-between items-center border-b border-gray-700 pb-3 mb-3">
-                        <span class="font-bold text-lg text-yellow-400">#{{ order.id|stringformat:".8s" }}</span>
+                        <span class="font-bold text-lg text-yellow-400">#{{ order.order_number|stringformat:"03d" }}</span>
                         <span class="text-xs px-2.5 py-1 rounded-full font-semibold
                             {% if order.status == 'PENDING' %}bg-yellow-500/20 text-yellow-400
                             {% elif order.status == 'PREPARING' %}bg-blue-500/20 text-blue-400
@@ -128,7 +134,7 @@
                 <tbody class="divide-y divide-gray-700 text-sm">
                     {% for order in all_orders %}
                     <tr class="hover:bg-gray-700/50 transition">
-                        <td class="px-6 py-4 font-mono font-medium text-yellow-400">#{{ order.id|stringformat:".8s" }}</td>
+                        <td class="px-6 py-4 font-mono font-medium text-yellow-400">#{{ order.order_number|stringformat:"03d" }}</td>
                         <td class="px-6 py-4 text-gray-400">{{ order.created_at|date:"d/m/Y H:i" }}</td>
                         <td class="px-6 py-4 text-white font-medium">{{ order.customer_name }}</td> 
                         
@@ -165,5 +171,35 @@
             });
         }
     </script>
+    <!-- Som de campainha escondido (Trazido gratuitamente de um banco de sons) -->
+    <audio id="order-bell" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+    <script>
+        // Data e hora em que a página foi carregada
+        const latestOrderTime = "{{ latest_time }}";
+        const checkUrl = "{% url 'check_new_orders' restaurant.slug %}?last_time=" + encodeURIComponent(latestOrderTime);
+        
+        function checkForNewOrders() {
+            fetch(checkUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.has_new_orders) {
+                        // Toca o som de alerta!
+                        const bell = document.getElementById('order-bell');
+                        bell.play().catch(e => console.log("Interação necessária para tocar o som."));
+                        
+                        // Espera 2 segundos para o som tocar e recarrega a página para exibir o pedido
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
+                    }
+                })
+                .catch(err => console.error("Erro ao verificar pedidos:", err));
+        }
+        
+        // Pergunta ao servidor a cada 10 segundos (10000 milissegundos)
+        setInterval(checkForNewOrders, 10000);
+    </script>
+
 </body>
 </html>

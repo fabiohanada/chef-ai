@@ -52,8 +52,13 @@
             </form>
 
             <div class="mt-8 text-center border-t border-slate-100 pt-4">
-                <p class="text-sm text-slate-600 mb-2">Não tem uma conta? <a href="{% url 'register' %}" class="text-blue-600 font-semibold hover:underline">Crie sua loja grátis</a></p>
+                <p class="text-sm text-slate-600 mb-2">Não tem uma conta? <a href="{% url 'merchant_register' %}" class="text-blue-600 font-semibold hover:underline">Crie sua loja grátis</a></p>
                 <p class="text-xs text-slate-400">Hanada System; 2026 — Gestão Inteligente para Restaurantes</p>
+
+                <!-- Link discreto para o Superadmin -->
+                <a href="{% url 'superadmin_subscriptions' %}" class="text-[10px] font-bold text-slate-300 hover:text-blue-600 mt-4 inline-block transition">
+                    🔒 Acesso Restrito (Superadmin)
+                </a>
             </div>
         </div>
 

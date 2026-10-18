@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crie o seu cardápio grátis - Chef AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-6">
+    <div class="max-w-4xl w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden grid grid-cols-1 md:grid-cols-2">
+        
+        <!-- Lado esquerdo: Formulário -->
+        <div class="p-8">
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-900">Crie o seu cardápio grátis</h1>
+                <p class="text-xs text-gray-500 mt-1">Automatize o seu atendimento hoje.</p>
+            </div>
+
+            {% if error %}
+            <div class="mb-4 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-xs font-medium">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" class="space-y-3">
+                {% csrf_token %>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nome do usuario *</label>
+                    <input type="text" name="name" required placeholder="João da Silva" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">E-mail pessoal *</label>
+                        <input type="email" name="email" required placeholder="seu@email.com" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-600 mb-1">Celular / WhatsApp *</label>
+                        <input type="text" name="whatsapp" required placeholder="(11) 99999-9999" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Nome do seu delivery *</label>
+                    <input type="text" id="restaurant_name" name="restaurant_name" required placeholder="Ex: Pizza do Chef" 
+                           oninput="generateSlug(this.value)"
+                           class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <p class="text-[10px] text-gray-400 mt-0.5">Link do cardápio: seudominio.com/<span id="slug-preview" class="font-bold text-gray-600">seu-slug</span></p>
+                    <input type="hidden" id="slug" name="slug">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Senha (fácil de lembrar) *</label>
+                    <input type="password" name="password" required placeholder="••••••••" class="w-full border rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-md mt-4">
+                    Cadastrar
+                </button>
+            </form>
+
+            <div class="text-center mt-4">
+                <a href="/login/" class="text-xs text-blue-600 hover:underline">Já tem uma conta? Fazer login</a>
+            </div>
+        </div>
+
+        <!-- Lado direito: Banner Azul -->
+        <div class="bg-blue-600 text-white p-8 flex flex-col justify-center items-center text-center">
+            <div class="text-5xl mb-4">🚀</div>
+            <h2 class="text-2xl font-bold mb-2">Aumente o seu faturamento</h2>
+            <p class="text-xs text-blue-100 max-w-xs leading-relaxed">
+                Automatize o atendimento do seu delivery com o robô de WhatsApp e conte com o sistema mais completo do Brasil!
+            </p>
+        </div>
+
+    </div>
+
+    <script>
+        function generateSlug(value) {
+            const slug = value
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9\s-]/g, '')
+                .trim()
+                .replace(/\s+/g, '-');
+
+            document.getElementById('slug').value = slug;
+            document.getElementById('slug-preview').innerText = slug || 'seu-slug';
+        }
+    </script>
+</body>
+</html>

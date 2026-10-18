@@ -37,17 +37,28 @@ class Order(models.Model):
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_number = models.PositiveIntegerField('Número do Pedido', blank=True, null=True) # <--- NOVO CAMPO
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='orders')
     customer_name = models.CharField('Nome do Cliente', max_length=100)
-    customer_phone = models.CharField('WhatsApp do Cliente', max_length=20)
+    customer_phone = models.CharField('WhatsApp do Cliente', max_length=20, blank=True)
     address = models.TextField('Endereço de Entrega')
-    payment_method = models.CharField('Forma de Pagamento', max_length=50, default='PIX') # <--- NOVO CAMPO
+    payment_method = models.CharField('Forma de Pagamento', max_length=50, default='PIX')
     status = models.CharField('Status', max_length=20, choices=STATUS_CHOICES, default='PENDING')
     total_amount = models.DecimalField('Total (R$)', max_digits=10, decimal_places=2, default=0.00)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        # Lógica para gerar o número sequencial do pedido por restaurante (#1, #2, #3...)
+        if not self.order_number:
+            last_order = Order.objects.filter(restaurant=self.restaurant).order_by('-order_number').first()
+            if last_order and last_order.order_number:
+                self.order_number = last_order.order_number + 1
+            else:
+                self.order_number = 1
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"Pedido #{str(self.id)[:8]} - {self.customer_name}"
+        return f"Pedido #{self.order_number} - {self.customer_name}"
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')

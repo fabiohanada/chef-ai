@@ -29,7 +29,7 @@
 
     <!-- Conteúdo Principal: O Cardápio Editável -->
     <main class="max-w-5xl mx-auto px-4">
-        
+
         <!-- Seção: Perfil da Loja (Novo) -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
             <div class="bg-gray-800 px-6 py-4">
@@ -174,6 +174,50 @@
             </form>
         </div>
 
+        <!-- Seção: Bairros e Taxas de Entrega -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+            <div class="bg-gray-800 px-6 py-4">
+                <h2 class="text-lg font-bold text-white">🛵 Bairros e Taxas de Entrega</h2>
+            </div>
+            
+            <div class="p-6">
+                <!-- Formulário para Adicionar Novo Bairro -->
+                <form action="{% url 'create_delivery_fee' restaurant.slug %}" method="POST" class="flex flex-col sm:flex-row gap-3 mb-6">
+                    {% csrf_token %}
+                    <input type="text" name="neighborhood" placeholder="Nome do Bairro (ex: Centro)" required class="flex-1 border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-red-500">
+                    <input type="number" step="0.01" name="fee" placeholder="Taxa (R$ ex: 5.00)" required class="w-full sm:w-36 border rounded-lg p-2.5 text-sm outline-none focus:ring-2 focus:ring-red-500">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold px-5 py-2.5 rounded-lg text-sm transition">
+                        + Adicionar Bairro
+                    </button>
+                </form>
+
+                <!-- Lista de Bairros Cadastrados -->
+                <div class="divide-y divide-gray-100">
+                    {% for fee in delivery_fees %}
+                        <div class="flex justify-between items-center py-3">
+                            <div>
+                                <span class="font-semibold text-gray-800">{{ fee.neighborhood }}</span>
+                                <span class="text-sm font-bold text-green-600 ml-3">R$ {{ fee.fee }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <a href="{% url 'edit_delivery_fee' restaurant.slug fee.id %}" class="text-blue-600 hover:text-blue-800 text-xs font-bold px-3 py-1.5 bg-blue-50 rounded-lg hover:bg-blue-100 transition">
+                                    ✏️ Editar
+                                </a>
+                                <form action="{% url 'delete_delivery_fee' restaurant.slug fee.id %}" method="POST" onsubmit="return confirm('Deseja apagar esta taxa?');" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-bold px-3 py-1.5 bg-red-50 rounded-lg hover:bg-red-100 transition">
+                                        🗑️ Apagar
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-sm text-gray-400 text-center py-4">Nenhum bairro cadastrado ainda.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-800">Suas Categorias e Produtos</h2>
             <a href="{% url 'create_category' restaurant.slug %}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition inline-block">
@@ -246,6 +290,28 @@
             </a>
         </div>
         {% endfor %}
+
+        <!-- Card 4: Status da Mensalidade / Plano do SaaS -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex items-center justify-between">
+            <div>
+                <p class="text-sm font-medium text-gray-500">Mensalidade do Sistema ({{ restaurant.get_plan_display }})</p>
+                <div class="flex items-center gap-2 mt-1">
+                    <h3 class="text-2xl font-bold text-gray-800">R$ {{ restaurant.monthly_fee|floatformat:2 }}</h3>
+                    <span class="text-xs px-2.5 py-1 rounded-full font-semibold
+                        {% if restaurant.subscription_status == 'ACTIVE' %} bg-green-500/20 text-green-600
+                        {% elif restaurant.subscription_status == 'PENDING' %} bg-yellow-500/20 text-yellow-600
+                        {% else %} bg-red-500/20 text-red-600 {% endif %}">
+                        {{ restaurant.get_subscription_status_display }}
+                    </span>
+                </div>
+                {% if restaurant.due_date %}
+                    <p class="text-xs text-gray-400 mt-1">Vencimento: {{ restaurant.due_date|date:"d/m/Y" }}</p>
+                {% endif %}
+            </div>
+            <div class="bg-indigo-50 p-3 rounded-lg text-indigo-600">
+                ⭐
+            </div>
+        </div>
 
     </main>
 </body>

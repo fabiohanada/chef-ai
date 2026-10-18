@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Superadmin - Gestão de Mensalidades</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Cabeçalho -->
+        <header class="bg-white shadow-sm border border-gray-200 rounded-xl p-6 mb-6 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">👑 Painel Geral do SaaS</h1>
+                <p class="text-sm text-gray-500">Gestão centralizada de Lojas, Planos e Assinaturas</p>
+            </div>
+            <a href="/admin/" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-700 transition">
+                Admin Django
+            </a>
+            <!-- Novo Botão de Sair -->
+            <a href="/logout/" class="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-semibold transition shadow-sm flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                Sair
+            </a>
+        </header>
+
+        <!-- Cartões de Métricas Globais -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border p-6 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total de Lojas</p>
+                    <h3 class="text-2xl font-bold text-gray-800 mt-1">{{ total_lojas }}</h3>
+                </div>
+                <div class="bg-blue-50 p-3 rounded-lg text-blue-600">🏪</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border p-6 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Assinaturas Ativas</p>
+                    <h3 class="text-2xl font-bold text-green-600 mt-1">{{ lojas_ativas }}</h3>
+                </div>
+                <div class="bg-green-50 p-3 rounded-lg text-green-600">✅</div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border p-6 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Em Atraso</p>
+                    <h3 class="text-2xl font-bold text-red-600 mt-1">{{ lojas_atrasadas }}</h3>
+                </div>
+                <div class="bg-red-50 p-3 rounded-lg text-red-600">⚠️</div>
+            </div>
+        </div>
+
+        <!-- Tabela de Estabelecimentos -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div class="p-6 border-b border-gray-200">
+                <h2 class="text-lg font-bold text-gray-800">Estabelecimentos Registados</h2>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 text-xs uppercase font-semibold border-b">
+                            <th class="p-4">Restaurante / Utilizador</th>
+                            <th class="p-4">Plano & Valor (R$)</th>
+                            <th class="p-4">Vencimento</th>
+                            <th class="p-4">Status</th>
+                            <th class="p-4 text-right">Ações de Gestão</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-sm">
+                        {% for r in restaurants %}
+                        <tr class="hover:bg-gray-50">
+                            <!-- Info da Loja -->
+                            <td class="p-4">
+                                <p class="font-bold text-gray-900">{{ r.name }}</p>
+                                <p class="text-xs text-gray-500">Dono: {{ r.user.username }} {% if not r.user.is_active %}<span class="text-red-500 font-bold">(BLOQUEADO)</span>{% endif %}</p>
+                            </td>
+                            
+                            <!-- Formulário de Atualização de Plano e Mensalidade -->
+                            <form method="POST">
+                                {% csrf_token %}
+                                <input type="hidden" name="restaurant_id" value="{{ r.id }}">
+                                <input type="hidden" name="action" value="update_sub">
+
+                                <td class="p-4">
+                                    <div class="flex flex-col gap-1">
+                                        <select name="plan" class="border rounded p-1 text-xs bg-white font-medium">
+                                            <option value="BASIC" {% if r.plan == 'BASIC' %}selected{% endif %}>Básico</option>
+                                            <option value="PRO" {% if r.plan == 'PRO' %}selected{% endif %}>Profissional</option>
+                                            <option value="PREMIUM" {% if r.plan == 'PREMIUM' %}selected{% endif %}>Premium</option>
+                                        </select>
+                                        <input type="number" step="0.01" name="monthly_fee" value="{{ r.monthly_fee }}" class="border rounded p-1 text-xs w-24">
+                                    </div>
+                                </td>
+
+                                <td class="p-4">
+                                    <input type="date" name="due_date" value="{{ r.due_date|date:'Y-m-d' }}" class="border rounded p-1 text-xs">
+                                </td>
+
+                                <td class="p-4">
+                                    <select name="subscription_status" class="border rounded p-1 text-xs font-semibold {% if r.subscription_status == 'ACTIVE' %}bg-green-50 text-green-700{% else %}bg-red-50 text-red-700{% endif %}">
+                                        <option value="ACTIVE" {% if r.subscription_status == 'ACTIVE' %}selected{% endif %}>Ativo</option>
+                                        <option value="OVERDUE" {% if r.subscription_status == 'OVERDUE' %}selected{% endif %}>Atraso</option>
+                                    </select>
+                                </td>
+
+                                <td class="p-4 text-right space-x-1">
+                                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-medium transition">
+                                        Guardar
+                                    </button>
+                            </form>
+
+                            <!-- Botão Separado para Bloquear / Ativar Utilizador -->
+                            <form method="POST" class="inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="restaurant_id" value="{{ r.id }}">
+                                <input type="hidden" name="action" value="toggle_block">
+                                {% if r.user.is_active %}
+                                    <button type="submit" onclick="return confirm('Tem a certeza que deseja bloquear o acesso deste utilizador?');" class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1.5 rounded text-xs font-medium transition">
+                                        Bloquear
+                                    </button>
+                                {% else %}
+                                    <button type="submit" onclick="return confirm('Deseja reativar o acesso deste utilizador?');" class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1.5 rounded text-xs font-medium transition">
+                                        Ativar
+                                    </button>
+                                {% endif %}
+                            </form>
+                                </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-6 text-center text-gray-400">Nenhum estabelecimento registado.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

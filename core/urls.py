@@ -7,12 +7,14 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # 2. Adiciona esta linha para redirecionar a raiz "/" para "/login/"
+    # Redireciona a raiz "/" para "/login/"
     path('', RedirectView.as_view(url='/login/', permanent=False)),
     
-    # As tuas rotas que já lá estão:
+    # 1º LÊ O ACCOUNTS: Para o resto das rotas de autenticação (como /login/)
     path('', include('accounts.urls')),
-    path('', include('menu.urls')), 
+    
+    # 2º LÊ O MENU: Assim o nosso onboarding e a rota /cadastro/ assumem o controlo
+        path('', include('menu.urls')), 
 ]
 
 if settings.DEBUG:

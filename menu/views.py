@@ -1,20 +1,21 @@
 import json
-from datetime import time
-
+from datetime import time, datetime, timedelta
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
-# Importações dos teus modelos
+# Importações dos teus modelos e formulários
 from tenants.models import Restaurant, PaymentMethod, OperatingHours
 from .models import Category, Product, Order, OrderItem, DeliveryFee
 from tenants.forms import RestaurantProfileForm
+from menu.forms import CategoryForm, ProductForm
+from django.db.models import Sum, Avg
+from django.contrib.admin.views.decorators import staff_member_required
 
-from django.utils import timezone
-
-# Adicione esta linha junto aos outros imports no topo:
-from .forms import CategoryForm, ProductForm
+from django.contrib.auth.models import User
+from django.contrib.auth import login
 
 # ==========================================
 # 1. VISÃO DO CLIENTE (Cardápio Digital)
@@ -24,68 +25,22 @@ def restaurant_menu(request, slug):
     categories = Category.objects.filter(restaurant=restaurant).prefetch_related('products')
     delivery_fees = DeliveryFee.objects.filter(restaurant=restaurant)
     
-    # --- LÓGICA DE ABERTO / FECHADO ---
-    # Pegamos a hora atual no fuso horário do servidor (Brasil)
+    is_open = is_restaurant_open(restaurant)
+    
     current_time = timezone.localtime(timezone.now())
-    # datetime.weekday() retorna 0 para Segunda e 6 para Domingo (bate certinho com o nosso banco!)
     current_day_str = str(current_time.weekday())
-    current_time_only = current_time.time()
-    
-    is_open = False
-    # Buscamos os horários de HOJE no banco de dados
     today_hours = restaurant.hours.filter(day=current_day_str).first()
-    
-    if today_hours and not today_hours.is_closed:
-        # Se a hora atual estiver entre a hora de abrir e fechar, a loja está aberta
-        if today_hours.opening_time <= current_time_only <= today_hours.closing_time:
-            is_open = True
-    # ----------------------------------
     all_hours = restaurant.hours.all().order_by('day')
     
     context = {
         'restaurant': restaurant,
         'categories': categories,
         'delivery_fees': delivery_fees,
-        'is_open': is_open,            # Enviamos o status de aberto/fechado para a tela
-        'today_hours': today_hours,    # Enviamos os horários de hoje para mostrar no texto
+        'is_open': is_open,
+        'today_hours': today_hours,
         'all_hours': all_hours,
     }
     return render(request, 'menu/cardapio.html', context)
-
-@csrf_exempt
-def create_order_api(request, slug):
-    if request.method == 'POST':
-        try:
-            restaurant = get_object_or_404(Restaurant, slug=slug, is_active=True)
-            data = json.loads(request.body)
-            
-            # Criar o pedido principal com o método de pagamento
-            order = Order.objects.create(
-                restaurant=restaurant,
-                customer_name=data.get('customer_name'),
-                customer_phone=data.get('customer_phone', ''),
-                address=data.get('address'),
-                payment_method=data.get('payment_method', 'PIX'),
-                total_amount=data.get('total_amount'),
-                status='PENDING'
-            )
-            
-            # Criar os itens do pedido
-            for item in data.get('items', []):
-                product = Product.objects.filter(name=item['name'], restaurant=restaurant).first()
-                OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=item['qty'],
-                    unit_price=item['price']
-                )
-                
-            return JsonResponse({'success': True, 'order_id': str(order.id)[:8]})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)}, status=400)
-            
-    return JsonResponse({'error': 'Método não permitido'}, status=405)
-
 
 # ==========================================
 # 2. PAINEL DA COZINHA (KDS)
@@ -93,19 +48,23 @@ def create_order_api(request, slug):
 def kitchen_dashboard(request, slug):
     restaurant = get_object_or_404(Restaurant, slug=slug)
     
-    # 1. Pedidos ATIVOS
-    active_orders = Order.objects.filter(restaurant=restaurant).exclude(status__in=['concluido', 'cancelado', 'COMPLETED', 'CANCELED']).order_by('created_at')
+    # Conta quantas lojas o utilizador dono deste restaurante possui
+    user_stores_count = Restaurant.objects.filter(user=restaurant.user).count()
+    has_multiple_stores = user_stores_count > 1
     
-    # 2. TODOS os pedidos
+    orders = Order.objects.filter(restaurant=restaurant).exclude(status__in=['concluido', 'cancelado', 'COMPLETED', 'CANCELED']).order_by('created_at')
     all_orders = Order.objects.filter(restaurant=restaurant).order_by('-created_at')
+    
+    latest_time = timezone.now().isoformat()
     
     context = {
         'restaurant': restaurant,
-        'active_orders': active_orders,
+        'orders': orders,
         'all_orders': all_orders,
+        'has_multiple_stores': has_multiple_stores, # <--- Variável de controlo
+        'latest_time': latest_time, # Passamos a data para o ecrã
     }
     return render(request, 'menu/kitchen.html', context)
-
 
 @csrf_exempt
 def update_order_status(request, order_id):
@@ -151,6 +110,7 @@ def restaurant_admin(request, slug):
             
     payment_methods = restaurant.payment_methods.all()
     operating_hours = restaurant.hours.all()
+    delivery_fees = restaurant.delivery_fees.all()
     
     # Instanciamos o formulário base para quando a página é apenas carregada (GET)
     profile_form = RestaurantProfileForm(instance=restaurant)
@@ -160,7 +120,6 @@ def restaurant_admin(request, slug):
         
         # A. Guardar Perfil
         if 'update_profile' in request.POST:
-            # ADICIONAMOS O request.FILES AQUI:
             profile_form = RestaurantProfileForm(request.POST, request.FILES, instance=restaurant)
             if profile_form.is_valid():
                 profile_form.save()
@@ -196,6 +155,7 @@ def restaurant_admin(request, slug):
         'profile_form': profile_form,
         'payment_methods': payment_methods,
         'operating_hours': operating_hours,
+        'delivery_fees': delivery_fees,
     }
     return render(request, 'menu/admin_cardapio.html', context)
 
@@ -285,3 +245,257 @@ def delete_product(request, slug, product_id):
     product = get_object_or_404(Product, id=product_id, restaurant=restaurant)
     product.delete()
     return redirect('restaurant_admin', slug=slug)
+
+@csrf_exempt
+def create_order_api(request, slug):
+    if request.method == 'POST':
+        try:
+            restaurant = get_object_or_404(Restaurant, slug=slug, is_active=True)
+            data = json.loads(request.body)
+            
+            # --- VALIDAÇÃO DE HORÁRIO ---
+            if not is_restaurant_open(restaurant):
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'A loja encontra-se encerrada no momento e não está a aceitar novos pedidos.'
+                }, status=400)
+            
+            # Cria o pedido principal associado ao restaurante com status em minúsculas ou compatível com a cozinha
+            order = Order.objects.create(
+                restaurant=restaurant,
+                customer_name=data.get('customer_name'),
+                customer_phone=data.get('customer_phone', ''),
+                address=data.get('address'),
+                payment_method=data.get('payment_method', 'PIX'),
+                total_amount=data.get('total_amount'),
+                status='PENDING' # Garante que fica em maiúsculas para o template reconhecer
+            )
+            
+            # Criar os itens do pedido associados
+            for item in data.get('items', []):
+                product = Product.objects.filter(name=item['name'], restaurant=restaurant).first()
+                OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=item['qty'],
+                    unit_price=item['price']
+                )
+                
+            return JsonResponse({'success': True, 'order_id': str(order.id)[:8]})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+            
+    return JsonResponse({'error': 'Método não permitido'}, status=405)
+
+@login_required
+def create_delivery_fee(request, slug):
+    restaurant = get_object_or_404(Restaurant, slug=slug, user=request.user)
+    
+    if request.method == 'POST':
+        neighborhood = request.POST.get('neighborhood')
+        fee = request.POST.get('fee')
+        if neighborhood and fee:
+            DeliveryFee.objects.create(
+                restaurant=restaurant,
+                neighborhood=neighborhood,
+                fee=fee
+            )
+    return redirect('restaurant_admin', slug=slug)
+
+@login_required
+def delete_delivery_fee(request, slug, fee_id):
+    restaurant = get_object_or_404(Restaurant, slug=slug, user=request.user)
+    fee = get_object_or_404(DeliveryFee, id=fee_id, restaurant=restaurant)
+    fee.delete()
+    return redirect('restaurant_admin', slug=slug)
+
+@login_required
+def edit_delivery_fee(request, slug, fee_id):
+    restaurant = get_object_or_404(Restaurant, slug=slug, user=request.user)
+    fee_obj = get_object_or_404(DeliveryFee, id=fee_id, restaurant=restaurant)
+    
+    if request.method == 'POST':
+        neighborhood = request.POST.get('neighborhood')
+        fee = request.POST.get('fee')
+        if neighborhood and fee:
+            fee_obj.neighborhood = neighborhood
+            fee_obj.fee = fee
+            fee_obj.save()
+            return redirect('restaurant_admin', slug=slug)
+            
+    context = {'fee': fee_obj, 'restaurant': restaurant}
+    return render(request, 'menu/edit_delivery_fee.html', context)
+
+@staff_member_required
+def superadmin_subscriptions_view(request):
+    restaurants = Restaurant.objects.all().select_related('user').order_by('-id')
+    
+    # Métricas globais do SaaS para o topo do painel
+    total_lojas = restaurants.count()
+    lojas_ativas = restaurants.filter(subscription_status='ACTIVE').count()
+    lojas_atrasadas = restaurants.filter(subscription_status='OVERDUE').count()
+    
+    if request.method == 'POST':
+        restaurant_id = request.POST.get('restaurant_id')
+        action = request.POST.get('action') # 'update_sub' ou 'toggle_block'
+        
+        rest_obj = get_object_or_404(Restaurant, id=restaurant_id)
+        
+        if action == 'update_sub':
+            rest_obj.plan = request.POST.get('plan')
+            rest_obj.subscription_status = request.POST.get('subscription_status')
+            rest_obj.monthly_fee = request.POST.get('monthly_fee')
+            due_date = request.POST.get('due_date')
+            rest_obj.due_date = due_date if due_date else None
+            rest_obj.save()
+            
+        elif action == 'toggle_block':
+            # Alterna o acesso do utilizador ao sistema (Bloquear/Ativar)
+            user = rest_obj.user
+            user.is_active = not user.is_active
+            user.save()
+            
+        return redirect('superadmin_subscriptions')
+
+    context = {
+        'restaurants': restaurants,
+        'total_lojas': total_lojas,
+        'lojas_ativas': lojas_ativas,
+        'lojas_atrasadas': lojas_atrasadas,
+    }
+    return render(request, 'menu/superadmin_subscriptions.html', context)
+
+# ==========================================
+# FUNÇÃO DE VERIFICAÇÃO DE HORÁRIO LIMPA
+# ==========================================
+def is_restaurant_open(restaurant):
+    # Obtém a hora e o dia atual com base no fuso horário configurado no Django
+    current_time = timezone.localtime(timezone.now())
+    current_day_str = str(current_time.weekday())  # '0' a '6' (Segunda a Domingo)
+    current_time_only = current_time.time()
+    
+    today_hours = restaurant.hours.filter(day=current_day_str).first()
+    
+    if not today_hours or today_hours.is_closed:
+        return False
+        
+    if today_hours.opening_time <= current_time_only <= today_hours.closing_time:
+        return True
+        
+    return False
+
+from django.utils.text import slugify
+
+def merchant_register(request):
+    if request.method == 'POST':
+        owner_name = request.POST.get('name') # "Nome do usuario"
+        email = request.POST.get('email')
+        whatsapp_number = request.POST.get('whatsapp') # "Celular"
+        restaurant_name = request.POST.get('restaurant_name') # "Nome do seu delivery"
+        password = request.POST.get('password')
+        
+        # Gera o slug automaticamente através do nome do delivery
+        base_slug = slugify(restaurant_name)
+        slug = base_slug
+        counter = 1
+        # Garante que o slug é único na base de dados
+        while Restaurant.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+            
+        # Define um username temporário baseado no email ou slug
+        username = email.split('@')[0]
+        if User.objects.filter(username=username).exists():
+            username = f"{username}_{slug}"
+
+        if User.objects.filter(email=email).exists():
+            context = {'error': 'Este e-mail já está a ser utilizado.'}
+            return render(request, 'menu/merchant_register.html', context)
+            
+        # 1. Cria o Utilizador
+        user = User.objects.create_user(username=username, email=email, password=password, first_name=owner_name)
+        
+        # 2. Cria o Restaurante
+        restaurant = Restaurant.objects.create(
+            user=user,
+            name=restaurant_name,
+            slug=slug,
+            whatsapp_number=whatsapp_number,
+            plan='PRO',
+            subscription_status='ACTIVE',
+            monthly_fee=99.90
+        )
+        
+        # 3. Cria formas de pagamento padrão
+        default_methods = [
+            ('Pix', 'ONLINE'),
+            ('Cartão de Crédito', 'DELIVERY'),
+            ('Dinheiro (Necessita Troco)', 'DELIVERY'),
+        ]
+        for name, category in default_methods:
+            PaymentMethod.objects.create(restaurant=restaurant, name=name, category=category, is_active=True)
+            
+        # 4. Cria horários padrão
+        for day_code, day_name in OperatingHours.DAYS_OF_WEEK:
+            OperatingHours.objects.create(
+                restaurant=restaurant,
+                day=day_code,
+                opening_time=time(11, 0),
+                closing_time=time(23, 0),
+                is_closed=False
+            )
+            
+        # 5. Faz login automático e redireciona para o painel da loja
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
+        login(request, user)
+        return redirect('restaurant_admin', slug=restaurant.slug)
+        
+    return render(request, 'menu/merchant_register.html')
+
+@login_required
+def financial_dashboard(request, slug):
+    restaurant = get_object_or_404(Restaurant, slug=slug, user=request.user)
+    
+    # === LÓGICA FINANCEIRA FICA TODA AQUI ===
+    current_filter = request.GET.get('filter', 'all')
+    now = timezone.now()
+    completed_orders = restaurant.orders.filter(status='COMPLETED')
+    
+    if current_filter == 'today':
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        completed_orders = completed_orders.filter(created_at__gte=start_of_day)
+    elif current_filter == '7days':
+        start_of_week = now - timedelta(days=7)
+        completed_orders = completed_orders.filter(created_at__gte=start_of_week)
+    elif current_filter == 'month':
+        start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        completed_orders = completed_orders.filter(created_at__gte=start_of_month)
+
+    total_orders_count = completed_orders.count()
+    total_revenue = completed_orders.aggregate(Sum('total_amount'))['total_amount__sum'] or 0.00
+    average_ticket = completed_orders.aggregate(Avg('total_amount'))['total_amount__avg'] or 0.00
+    
+    context = {
+        'restaurant': restaurant,
+        'current_filter': current_filter,
+        'total_orders_count': total_orders_count,
+        'total_revenue': total_revenue,
+        'average_ticket': average_ticket,
+    }
+    return render(request, 'menu/financial_dashboard.html', context)
+
+def check_new_orders(request, slug):
+    restaurant = get_object_or_404(Restaurant, slug=slug)
+    last_time_str = request.GET.get('last_time')
+    has_new = False
+    
+    if last_time_str:
+        try:
+            # Converte a string de volta para data
+            last_time = datetime.fromisoformat(last_time_str)
+            # Verifica se existe algum pedido criado DEPOIS dessa data
+            has_new = Order.objects.filter(restaurant=restaurant, created_at__gt=last_time).exists()
+        except ValueError:
+            pass
+            
+    return JsonResponse({'has_new_orders': has_new})

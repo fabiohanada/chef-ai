@@ -17,6 +17,13 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 
+import requests
+
+from twilio.rest import Client
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 # ==========================================
 # 1. VISÃO DO CLIENTE (Cardápio Digital)
 # ==========================================
@@ -71,11 +78,61 @@ def update_order_status(request, order_id):
     if request.method == 'POST':
         data = json.loads(request.body)
         order = get_object_or_404(Order, id=order_id)
-        order.status = data.get('status')
-        order.save()
+        novo_status = data.get('status')
+        
+        # Só envia a mensagem se o status realmente mudou
+        if order.status != novo_status:
+            order.status = novo_status
+            order.save()
+            
+            # Chama a nossa função de disparo de WhatsApp
+            enviar_notificacao_whatsapp(order)
+            
         return JsonResponse({'success': True, 'status': order.status})
     return JsonResponse({'error': 'Método não permitido'}, status=405)
 
+# --- NOVA FUNÇÃO DE DISPARO ---
+def enviar_notificacao_whatsapp(order):
+    # Dicionário de mensagens
+    mensagens = {
+        'PREPARING': f"👨‍🍳 Olá {order.customer_name}! O seu pedido na {order.restaurant.name} já está na cozinha a ser preparado. Avisamos quando sair!",
+        'DISPATCHED': f"🛵 Boas notícias, {order.customer_name}! O seu pedido acabou de sair para entrega. Prepare a mesa!",
+        'COMPLETED': f"✅ Pedido entregue! A {order.restaurant.name} agradece a preferência. Bom apetite!",
+        'CANCELED': f"❌ Olá {order.customer_name}, o seu pedido teve de ser cancelado. Por favor, entre em contacto com a loja para mais detalhes."
+    }
+    
+    mensagem_texto = mensagens.get(order.status)
+    telefone_cliente = order.customer_phone
+    
+    if mensagem_texto and telefone_cliente:
+        try:
+            # CREDENCIAIS DO TWILIO (Substitui pelos teus dados reais do painel do Twilio)
+            TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID')
+            TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN')
+            TWILIO_WHATSAPP_NUMBER = 'whatsapp:+14155238886' # Exemplo do número Sandbox
+            
+            # Formata o número do cliente para o padrão internacional do WhatsApp (ex: +5511999999999)
+            # Retira qualquer traço ou espaço que possa ter vindo do formulário
+            telefone_limpo = ''.join(filter(str.isdigit, telefone_cliente))
+            
+            # Garante que tem o código do Brasil (+55) se o cliente não o tiver colocado
+            if not telefone_limpo.startswith('55'):
+                telefone_limpo = f"55{telefone_limpo}"
+                
+            numero_destino = f"whatsapp:+{telefone_limpo}"
+            
+            # Inicializa o cliente e envia a mensagem
+            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            message = client.messages.create(
+                from_=TWILIO_WHATSAPP_NUMBER,
+                body=mensagem_texto,
+                to=numero_destino
+            )
+            
+            print(f"Mensagem enviada com sucesso! SID: {message.sid}")
+            
+        except Exception as e:
+            print(f"Erro ao enviar WhatsApp pelo Twilio: {e}")
 
 # ==========================================
 # 3. PAINEL DO GESTOR (Configurações)

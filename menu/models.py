@@ -80,3 +80,20 @@ class DeliveryFee(models.Model):
 
     def __str__(self):
         return f"{self.neighborhood} - R$ {self.fee}"
+    
+class Subscription(models.Model):
+    STATUS_CHOICES = [
+        ('PENDING', 'Pendente'),
+        ('ACTIVE', 'Ativa'),
+        ('CANCELED', 'Cancelada'),
+    ]
+
+    # Alterado para apontar diretamente para a classe Restaurant (com R maiúsculo)
+    restaurant = models.OneToOneField(Restaurant, on_delete=models.CASCADE, related_name='subscription')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    mercadopago_preference_id = models.CharField(max_length=255, blank=True, null=True)
+    expires_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Assinatura de {self.restaurant.name} - {self.status}"

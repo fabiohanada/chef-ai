@@ -311,6 +311,16 @@
             <div class="bg-indigo-50 p-3 rounded-lg text-indigo-600">
                 ⭐
             </div>
+
+            <!-- Condição: Só mostra o botão se o status NÃO for 'ACTIVE' (ou seja, se estiver PENDING ou CANCELED) -->
+            {% if restaurant.subscription.status != 'ACTIVE' %}
+                <div class="mt-4">
+                    <a href="{% url 'pagar_mensalidade' restaurant.id %}" 
+                    class="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition shadow-md inline-block">
+                    Pagar Mensalidade (R$ 99,90)
+                    </a>
+                </div>
+            {% endif %}
         </div>
 
     </main>

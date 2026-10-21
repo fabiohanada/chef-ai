@@ -1,27 +1,30 @@
+# 1. Biblioteca Padrão do Python
 import json
-from datetime import time, datetime, timedelta
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.utils import timezone
-
-# Importações dos teus modelos e formulários
-from tenants.models import Restaurant, PaymentMethod, OperatingHours
-from .models import Category, Product, Order, OrderItem, DeliveryFee
-from tenants.forms import RestaurantProfileForm
-from menu.forms import CategoryForm, ProductForm
-from django.db.models import Sum, Avg
-from django.contrib.admin.views.decorators import staff_member_required
-
-from django.contrib.auth.models import User
-from django.contrib.auth import login
-
-import requests
-
-from twilio.rest import Client
 import os
+from datetime import datetime, time, timedelta
+
+# 2. Bibliotecas de Terceiros
+import mercadopago
+import requests
 from dotenv import load_dotenv
+from twilio.rest import Client
+
+# 3. Django
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import login
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.db.models import Avg, Sum
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+
+# 4. Aplicações do Projeto (Tenants e Menu)
+from menu.forms import CategoryForm, ProductForm
+from menu.models import Category, DeliveryFee, Order, OrderItem, Product, Subscription
+from tenants.forms import RestaurantProfileForm
+from tenants.models import OperatingHours, PaymentMethod, Restaurant
 
 load_dotenv()
 # ==========================================
@@ -401,7 +404,15 @@ def superadmin_subscriptions_view(request):
         if action == 'update_sub':
             rest_obj.plan = request.POST.get('plan')
             rest_obj.subscription_status = request.POST.get('subscription_status')
-            rest_obj.monthly_fee = request.POST.get('monthly_fee')
+            
+            # --- NOVA PROTEÇÃO DA MENSALIDADE AQUI ---
+            monthly_fee_str = request.POST.get('monthly_fee')
+            if not monthly_fee_str:
+                rest_obj.monthly_fee = 0.00  # Se vier vazio, guarda 0
+            else:
+                rest_obj.monthly_fee = monthly_fee_str
+            # -----------------------------------------
+            
             due_date = request.POST.get('due_date')
             rest_obj.due_date = due_date if due_date else None
             rest_obj.save()
@@ -556,3 +567,65 @@ def check_new_orders(request, slug):
             pass
             
     return JsonResponse({'has_new_orders': has_new})
+
+def criar_pagamento_mensalidade(request, restaurant_id):
+    # Procura o restaurante pelo ID
+    restaurant = get_object_or_404(Restaurant, id=restaurant_id)
+    
+    # Inicia o Mercado Pago usando a chave do teu ficheiro .env
+    mp_token = os.environ.get('MP_ACCESS_TOKEN')
+    sdk = mercadopago.SDK(mp_token)
+    
+    # Cria o "boleto/Pix" digital com URLs fictícias seguras para teste
+    preference_data = {
+        "items": [
+            {
+                "title": f"Mensalidade Chef AI - {restaurant.name}",
+                "quantity": 1,
+                "unit_price": 99.90
+            }
+        ],
+        "back_urls": {
+            "success": "https://www.google.com",
+            "failure": "https://www.google.com",
+            "pending": "https://www.google.com"
+        },
+        "auto_return": "approved"
+    }
+
+    result = sdk.preference().create(preference_data)
+    preference = result.get("response")
+    
+    # Imprime a resposta completa do Mercado Pago no teu terminal para vermos o erro
+    print("RESPOSTA MERCADO PAGO:", result) 
+    
+    # Verificamos se o 'id' realmente existe na resposta antes de tentar usá-lo
+    if preference and 'id' in preference:
+        sub, created = Subscription.objects.get_or_create(restaurant=restaurant)
+        sub.mercadopago_preference_id = preference['id']
+        sub.save()
+        
+        return redirect(preference['init_point'])
+    else:
+        # Se falhar, imprime um erro no terminal e volta para a página anterior
+        print("FALHA AO CRIAR PREFERÊNCIA. Verifique o token ou os dados enviados.")
+        return redirect(request.META.get('HTTP_REFERER', '/'))
+    
+@csrf_exempt
+def mercadopago_webhook(request):
+    if request.method == 'POST':
+        try:
+            # Lê os dados que o Mercado Pago enviou
+            data = json.loads(request.body)
+            print("WEBHOOK RECEBIDO DO MERCADO PAGO:", data)
+            
+            # Aqui vamos colocar a lógica para ler o ID do pagamento 
+            # e atualizar a Subscription para 'ACTIVE' na base de dados
+            
+            # Respondemos sempre com status 200 para o Mercado Pago saber que recebemos
+            return JsonResponse({'status': 'sucesso'}, status=200)
+            
+        except Exception as e:
+            return JsonResponse({'erro': str(e)}, status=400)
+            
+    return JsonResponse({'erro': 'Método inválido'}, status=405)

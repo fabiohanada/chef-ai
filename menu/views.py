@@ -26,12 +26,21 @@ from menu.models import Category, DeliveryFee, Order, OrderItem, Product, Subscr
 from tenants.forms import RestaurantProfileForm
 from tenants.models import OperatingHours, PaymentMethod, Restaurant
 
+from datetime import datetime
+from django.utils import timezone
+
 load_dotenv()
 # ==========================================
 # 1. VISÃO DO CLIENTE (Cardápio Digital)
 # ==========================================
 def restaurant_menu(request, slug):
-    restaurant = get_object_or_404(Restaurant, slug=slug, is_active=True)
+    restaurant = get_object_or_404(Restaurant, slug=slug)
+    
+    # --- BLOQUEIO AUTOMÁTICO POR INADIMPLÊNCIA ---
+    if restaurant.subscription_status == 'OVERDUE':
+        return render(request, 'menu/loja_indisponivel.html', {'restaurant': restaurant})
+    # ---------------------------------------------
+    
     categories = Category.objects.filter(restaurant=restaurant).prefetch_related('products')
     delivery_fees = DeliveryFee.objects.filter(restaurant=restaurant)
     
@@ -57,6 +66,11 @@ def restaurant_menu(request, slug):
 # ==========================================
 def kitchen_dashboard(request, slug):
     restaurant = get_object_or_404(Restaurant, slug=slug)
+    
+    # --- BLOQUEIO NO PAINEL DO LOJISTA ---
+    if restaurant.subscription_status == 'OVERDUE':
+        # Renderiza a tela de pagamento pendente em vez da cozinha
+        return render(request, 'menu/pagamento_pendente.html', {'restaurant': restaurant})
     
     # Conta quantas lojas o utilizador dono deste restaurante possui
     user_stores_count = Restaurant.objects.filter(user=restaurant.user).count()
@@ -390,6 +404,14 @@ def edit_delivery_fee(request, slug, fee_id):
 def superadmin_subscriptions_view(request):
     restaurants = Restaurant.objects.all().select_related('user').order_by('-id')
     
+    # --- VERIFICAÇÃO AUTOMÁTICA DE VENCIMENTO ---
+    hoje = timezone.now().date()
+    for rest in restaurants:
+        if rest.due_date and rest.due_date < hoje and rest.subscription_status != 'OVERDUE':
+            rest.subscription_status = 'OVERDUE'
+            rest.save(update_fields=['subscription_status'])
+    # ---------------------------------------------
+    
     # Métricas globais do SaaS para o topo do painel
     total_lojas = restaurants.count()
     lojas_ativas = restaurants.filter(subscription_status='ACTIVE').count()
@@ -402,26 +424,32 @@ def superadmin_subscriptions_view(request):
         rest_obj = get_object_or_404(Restaurant, id=restaurant_id)
         
         if action == 'update_sub':
-            rest_obj.plan = request.POST.get('plan')
-            rest_obj.subscription_status = request.POST.get('subscription_status')
-            
-            # --- NOVA PROTEÇÃO DA MENSALIDADE AQUI ---
+            # --- PROTEÇÃO DA MENSALIDADE ---
             monthly_fee_str = request.POST.get('monthly_fee')
             if not monthly_fee_str:
                 rest_obj.monthly_fee = 0.00  # Se vier vazio, guarda 0
             else:
                 rest_obj.monthly_fee = monthly_fee_str
-            # -----------------------------------------
+            # -------------------------------
             
-            due_date = request.POST.get('due_date')
-            rest_obj.due_date = due_date if due_date else None
+            due_date_str = request.POST.get('due_date')
+            if due_date_str:
+                try:
+                    rest_obj.due_date = datetime.strptime(due_date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    rest_obj.due_date = None
+            else:
+                rest_obj.due_date = None
+            
+            if rest_obj.due_date and rest_obj.due_date >= hoje and rest_obj.subscription_status == 'OVERDUE':
+                rest_obj.subscription_status = 'ACTIVE'
+                
             rest_obj.save()
             
         elif action == 'toggle_block':
-            # Alterna o acesso do utilizador ao sistema (Bloquear/Ativar)
-            user = rest_obj.user
-            user.is_active = not user.is_active
-            user.save()
+            # AGORA BLOQUEIA APENAS ESTE RESTAURANTE INDIVIDUALMENTE
+            rest_obj.is_active = not rest_obj.is_active
+            rest_obj.save(update_fields=['is_active'])
             
         return redirect('superadmin_subscriptions')
 
@@ -572,23 +600,36 @@ def criar_pagamento_mensalidade(request, restaurant_id):
     # Procura o restaurante pelo ID
     restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     
+    # 1. Identifica qual plano o lojista escolheu através do link (?plano=teste, ?plano=plus, ou ?plano=premium)
+    tipo_plano = request.GET.get('plano', 'plus') # 'plus' é o valor padrão se não vier nada
+    
+    if tipo_plano == 'teste':
+        titulo = f"Mensalidade Plano Teste - {restaurant.name}"
+        valor = 1.00
+    elif tipo_plano == 'premium':
+        titulo = f"Mensalidade Plano Premium - {restaurant.name}"
+        valor = 79.90
+    else:
+        titulo = f"Mensalidade Plano Plus - {restaurant.name}"
+        valor = 39.90
+
     # Inicia o Mercado Pago usando a chave do teu ficheiro .env
     mp_token = os.environ.get('MP_ACCESS_TOKEN')
     sdk = mercadopago.SDK(mp_token)
     
-    # Cria o "boleto/Pix" digital com URLs fictícias seguras para teste
+    # Cria o "boleto/Pix" digital com o valor dinâmico do plano escolhido
     preference_data = {
         "items": [
             {
-                "title": f"Mensalidade Chef AI - {restaurant.name}",
+                "title": titulo,
                 "quantity": 1,
-                "unit_price": 99.90
+                "unit_price": float(valor)
             }
         ],
         "back_urls": {
             "success": "https://www.google.com",
             "failure": "https://www.google.com",
-            "pending": "https://www.google.com"
+            "pending": "https://www.google.com",
         },
         "auto_return": "approved"
     }
@@ -596,7 +637,7 @@ def criar_pagamento_mensalidade(request, restaurant_id):
     result = sdk.preference().create(preference_data)
     preference = result.get("response")
     
-    # Imprime a resposta completa do Mercado Pago no teu terminal para vermos o erro
+    # Imprime a resposta completa do Mercado Pago no teu terminal para vermos
     print("RESPOSTA MERCADO PAGO:", result) 
     
     # Verificamos se o 'id' realmente existe na resposta antes de tentar usá-lo
@@ -605,7 +646,9 @@ def criar_pagamento_mensalidade(request, restaurant_id):
         sub.mercadopago_preference_id = preference['id']
         sub.save()
         
-        return redirect(preference['init_point'])
+        # Garante que redireciona corretamente (usa sandbox para testes ou init_point para produção)
+        url_pagamento = preference.get('init_point') or preference.get('sandbox_init_point')
+        return redirect(url_pagamento)
     else:
         # Se falhar, imprime um erro no terminal e volta para a página anterior
         print("FALHA AO CRIAR PREFERÊNCIA. Verifique o token ou os dados enviados.")

@@ -46,5 +46,5 @@ urlpatterns = [
     # 3. ÁREA PÚBLICA (Cliente Final) - SEMPRE NO FIM
     # ==========================================
     # Fica no fim para não interferir com rotas como "cadastro", "painel-geral", etc.
-    path('<slug:slug>/', views.restaurant_menu, name='restaurant_menu'),
+    path('<slug:slug>/cardapio-cliente/', views.restaurant_menu, name='restaurant_menu'),
 ]

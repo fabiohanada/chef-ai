@@ -34,12 +34,13 @@ load_dotenv()
 # 1. VISÃO DO CLIENTE (Cardápio Digital)
 # ==========================================
 def restaurant_menu(request, slug):
+    # Procura o restaurante pelo slug sem filtrar is_active na query para evitar erro 404 técnico
     restaurant = get_object_or_404(Restaurant, slug=slug)
     
-    # --- BLOQUEIO AUTOMÁTICO POR INADIMPLÊNCIA ---
-    if restaurant.subscription_status == 'OVERDUE':
+    # --- BLOQUEIO SE A LOJA ESTIVER INATIVA OU EM ATRASO ---
+    if not restaurant.is_active or restaurant.subscription_status == 'OVERDUE':
         return render(request, 'menu/loja_indisponivel.html', {'restaurant': restaurant})
-    # ---------------------------------------------
+    # -----------------------------------------------------
     
     categories = Category.objects.filter(restaurant=restaurant).prefetch_related('products')
     delivery_fees = DeliveryFee.objects.filter(restaurant=restaurant)
@@ -596,17 +597,31 @@ def check_new_orders(request, slug):
             
     return JsonResponse({'has_new_orders': has_new})
 
+from datetime import timedelta
+from django.utils import timezone
+
 def criar_pagamento_mensalidade(request, restaurant_id):
     # Procura o restaurante pelo ID
     restaurant = get_object_or_404(Restaurant, id=restaurant_id)
     
-    # 1. Identifica qual plano o lojista escolheu através do link (?plano=teste, ?plano=plus, ou ?plano=premium)
+    # Identifica qual plano o lojista escolheu através do link (?plano=teste, ?plano=plus, ou ?plano=premium)
     tipo_plano = request.GET.get('plano', 'plus') # 'plus' é o valor padrão se não vier nada
     
+    # --- SIMULAÇÃO INSTANTÂNEA PARA O PLANO TESTE ---
     if tipo_plano == 'teste':
-        titulo = f"Mensalidade Plano Teste - {restaurant.name}"
-        valor = 1.00
-    elif tipo_plano == 'premium':
+        restaurant.subscription_status = 'ACTIVE'
+        restaurant.plan = 'BASIC' # Ou o plano correspondente ao teste
+        restaurant.monthly_fee = 1.00
+        # Define a nova data de vencimento para daqui a 30 dias a contar de hoje
+        restaurant.due_date = timezone.now().date() + timedelta(days=30)
+        restaurant.save()
+        
+        # Redireciona de volta para o admin do cardápio com o painel já atualizado
+        return redirect('restaurant_admin', slug=restaurant.slug)
+    # -----------------------------------------------
+
+    # Se não for o plano de teste, continua o fluxo normal do Mercado Pago para Plus / Premium:
+    if tipo_plano == 'premium':
         titulo = f"Mensalidade Plano Premium - {restaurant.name}"
         valor = 79.90
     else:
@@ -637,20 +652,16 @@ def criar_pagamento_mensalidade(request, restaurant_id):
     result = sdk.preference().create(preference_data)
     preference = result.get("response")
     
-    # Imprime a resposta completa do Mercado Pago no teu terminal para vermos
     print("RESPOSTA MERCADO PAGO:", result) 
     
-    # Verificamos se o 'id' realmente existe na resposta antes de tentar usá-lo
     if preference and 'id' in preference:
         sub, created = Subscription.objects.get_or_create(restaurant=restaurant)
         sub.mercadopago_preference_id = preference['id']
         sub.save()
         
-        # Garante que redireciona corretamente (usa sandbox para testes ou init_point para produção)
         url_pagamento = preference.get('init_point') or preference.get('sandbox_init_point')
         return redirect(url_pagamento)
     else:
-        # Se falhar, imprime um erro no terminal e volta para a página anterior
         print("FALHA AO CRIAR PREFERÊNCIA. Verifique o token ou os dados enviados.")
         return redirect(request.META.get('HTTP_REFERER', '/'))
     

@@ -298,10 +298,19 @@
                 <div class="flex items-center gap-2 mt-1">
                     <!-- O valor em dinheiro foi removido daqui -->
                     <span class="text-xs px-2.5 py-1 rounded-full font-semibold
-                        {% if restaurant.subscription_status == 'ACTIVE' %} bg-green-500/20 text-green-600
-                        {% elif restaurant.subscription_status == 'PENDING' %} bg-yellow-500/20 text-yellow-600
-                        {% else %} bg-red-500/20 text-red-600 {% endif %}">
-                        {{ restaurant.get_subscription_status_display }}
+                        {% if not restaurant.is_active %} 
+                            bg-red-500/20 text-red-600
+                        {% elif restaurant.subscription_status == 'ACTIVE' %} 
+                            bg-green-500/20 text-green-600
+                        {% else %} 
+                            bg-red-500/20 text-red-600 
+                        {% endif %}">
+                        
+                        {% if not restaurant.is_active %}
+                            Loja Bloqueada
+                        {% else %}
+                            {{ restaurant.get_subscription_status_display }}
+                        {% endif %}
                     </span>
                 </div>
                 {% if restaurant.due_date %}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loja Indisponível - {{ restaurant.name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-6">
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 max-w-md w-full p-8 text-center">
+        <div class="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+            🔒
+        </div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">{{ restaurant.name }}</h1>
+        <p class="text-gray-600 text-sm mb-6">
+            Este estabelecimento encontra-se temporariamente indisponível ou com o acesso suspenso no momento. Por favor, tente novamente mais tarde.
+        </p>
+        <div class="border-t pt-4 text-xs text-gray-400">
+            Painel de Gestão SaaS
+        </div>
+    </div>
+</body>
+</html>

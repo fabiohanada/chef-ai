@@ -48,20 +48,19 @@
                         {{ profile_form.name }}
                     </div>
                     
-                    <!-- CAMPO: Logótipo Otimizado -->
+                    <!-- CAMPO: Logótipo Corrigido -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Logotipo</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Logótipo</label>
                         
-                        <!-- Input estilizado e limpo -->
                         <div class="flex items-center gap-3">
                             <label class="cursor-pointer bg-gray-50 hover:bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2">
                                 📁 Escolher imagem
+                                <!-- Importante: o name="logo" é obrigatório para o Django receber o ficheiro -->
                                 <input type="file" name="logo" id="id_logo" accept="image/*" class="hidden" onchange="previewLogo(event)">
                             </label>
                             <span id="file-name" class="text-xs text-gray-500 truncate max-w-[150px]">Nenhum ficheiro</span>
                         </div>
                         
-                        <!-- Miniatura / Pré-visualização -->
                         <div class="mt-3">
                             {% if restaurant.logo %}
                                 <img id="logo-preview" src="{{ restaurant.logo.url }}" alt="Logótipo atual" class="h-12 w-12 rounded-full object-cover border border-gray-300 shadow-sm">

@@ -48,17 +48,27 @@
                         {{ profile_form.name }}
                     </div>
                     
-                    <!-- NOVO CAMPO: Logótipo -->
+                    <!-- CAMPO: Logótipo Otimizado -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Logótipo</label>
-                        {{ profile_form.logo }}
                         
-                        <!-- Se já houver um logótipo salvo, mostramos uma miniatura -->
-                        {% if restaurant.logo %}
-                        <div class="mt-2">
-                            <img src="{{ restaurant.logo.url }}" alt="Logótipo atual" class="h-10 w-10 rounded-full object-cover border border-gray-300">
+                        <!-- Input estilizado e limpo -->
+                        <div class="flex items-center gap-3">
+                            <label class="cursor-pointer bg-gray-50 hover:bg-gray-100 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-2">
+                                📁 Escolher imagem
+                                <input type="file" name="logo" id="id_logo" accept="image/*" class="hidden" onchange="previewLogo(event)">
+                            </label>
+                            <span id="file-name" class="text-xs text-gray-500 truncate max-w-[150px]">Nenhum ficheiro</span>
                         </div>
-                        {% endif %}
+                        
+                        <!-- Miniatura / Pré-visualização -->
+                        <div class="mt-3">
+                            {% if restaurant.logo %}
+                                <img id="logo-preview" src="{{ restaurant.logo.url }}" alt="Logótipo atual" class="h-12 w-12 rounded-full object-cover border border-gray-300 shadow-sm">
+                            {% else %}
+                                <img id="logo-preview" src="" alt="Pré-visualização" class="h-12 w-12 rounded-full object-cover border border-gray-300 shadow-sm hidden">
+                            {% endif %}
+                        </div>
                     </div>
                     
                     <div>
@@ -351,4 +361,20 @@
 
     </main>
 </body>
+
+<script>
+function previewLogo(event) {
+    const file = event.target.files[0];
+    if (file) {
+        // Atualiza o texto com o nome do ficheiro escolhido
+        document.getElementById('file-name').textContent = file.name;
+        
+        // Mostra a pré-visualização da imagem escolhida
+        const preview = document.getElementById('logo-preview');
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+    }
+}
+</script>
+
 </html>

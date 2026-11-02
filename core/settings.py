@@ -122,10 +122,43 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Configuração do Supabase Storage (S3) utilizando variáveis de ambiente
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', 'media')
-AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL')
-AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-west-2')
-AWS_DEFAULT_ACL = 'public-read'
+AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', 'media').strip()
+AWS_S3_CUSTOM_DOMAIN = f"verzuqlglsldathxteok.supabase.co/storage/v1/object/public/{AWS_STORAGE_BUCKET_NAME}"
+
+# Verifica se estamos em desenvolvimento local ou em produção no Render
+if DEBUG:
+    # No teu PC: Usa o sistema de ficheiros normal (sem erros de S3)
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+else:
+    # No Render (Produção): Usa o Supabase Storage na nuvem de forma permanente
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME', 'media').strip()
+    AWS_S3_CUSTOM_DOMAIN = f"verzuqlglsldathxteok.supabase.co/storage/v1/object/public/{AWS_STORAGE_BUCKET_NAME}"
+    
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "access_key": os.getenv('AWS_ACCESS_KEY_ID', '').strip(),
+                "secret_key": os.getenv('AWS_SECRET_ACCESS_KEY', '').strip(),
+                "bucket_name": AWS_STORAGE_BUCKET_NAME,
+                "endpoint_url": os.getenv('AWS_S3_ENDPOINT_URL', '').strip(),
+                "region_name": os.getenv('AWS_S3_REGION_NAME', 'sa-east-1').strip(),
+                "default_acl": None,
+                "file_overwrite": True,
+                "querystring_auth": False,
+                "custom_domain": AWS_S3_CUSTOM_DOMAIN,
+                "addressing_style": "path",
+                "signature_version": "s3v4",
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
